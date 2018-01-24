@@ -31,27 +31,64 @@ import (
 	"syscall"
 )
 
+//Stores the configuration of the program.
+//This is needed to easily pass program configration to the children created after
+//the original invocation through the user.
+type programConfig struct {
+	ExecProgramm    string
+	HomeDirectories []string
+}
+
 func main() {
-	userJson := flag.String("user", "", "")
-	flag.Parse()
-	if userJson == nil || *userJson == "" {
-		restartInNamespace()
+	pg, userJSON := parseArgs()
+	if userJSON == "" {
+		restartInNamespace(pg)
 		return
 	}
 	user := user.User{}
-	err := json.Unmarshal([]byte(*userJson), &user)
+	err := json.Unmarshal([]byte(userJSON), &user)
 	if err != nil {
 		log.Println("Wrong user provided. Please don't use the argument manually")
 		return
 	}
 	rootBase := setUpNewRootFS()
-	setUpHomeDirectory(user, rootBase)
-	startCommand(rootBase, user)
+	setUpHomeDirectory(rootBase, user, pg.HomeDirectories)
+	startCommand(rootBase, user, pg.ExecProgramm)
+}
+
+//Parses the program arguments for the programConfig and the user information.
+//The user information is either an emtpy string (tpyicall on invocation through the user)
+//or the JSON version of the user.User instance of the original caller.
+//programConfig is always there but its field may be empty.
+func parseArgs() (programConfig, string) {
+	var pg programConfig
+	userJSON := flag.String("user", "", "")
+	execProgramm := flag.String("exec", "", "")
+	confJSON := flag.String("config", "", "")
+	flag.Parse()
+	if confJSON != nil && *confJSON != "" {
+		err := json.Unmarshal([]byte(*confJSON), &pg)
+		if err != nil {
+			onErrorLogAndExit(err)
+		}
+	}
+	if execProgramm != nil && *execProgramm != "" {
+		pg.ExecProgramm = *execProgramm
+	}
+	homeDirectories := []string{}
+	for _, p := range flag.Args() {
+		homeDirectories = append(homeDirectories, p)
+	}
+	if len(homeDirectories) > 0 || pg.HomeDirectories == nil {
+		pg.HomeDirectories = homeDirectories
+	}
+	return pg, *userJSON
 }
 
 //Restarts this application in a new user, mount and pid namespace while the user id
 //of the caller is mapped to 0.
-func restartInNamespace() {
+//The given programConfig will be passed to the newly created child process.
+func restartInNamespace(pg programConfig) {
 	user, err := user.Current()
 	onErrorLogAndExit(err)
 	if user.HomeDir == "/root" {
@@ -60,7 +97,9 @@ func restartInNamespace() {
 	}
 	userData, err := json.Marshal(user)
 	onErrorLogAndExit(err)
-	cmd := exec.Command(os.Args[0], append([]string{"-user", string(userData)}, flag.Args()...)...)
+	confData, err := json.Marshal(pg)
+	onErrorLogAndExit(err)
+	cmd := exec.Command(os.Args[0], "-user", string(userData), "-config", string(confData))
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -116,27 +155,34 @@ func setUpNewRootFS() (rootBase string) {
 	return
 }
 
-//Takes the unnamed arguments as directories that are bound under <rootBase>/home/<user>/
-func setUpHomeDirectory(user user.User, rootBase string) {
+//Takes the strings in homeDirectories as directories that are bound under <rootBase>/home/<user>/
+func setUpHomeDirectory(rootBase string, user user.User, homeDirectories []string) {
 	newHomeDir := rootBase + user.HomeDir
 	onErrorLogAndExit(os.MkdirAll(newHomeDir, 0700))
-	for _, p := range flag.Args() {
-		dirName := path.Base(p)
+	for _, hd := range homeDirectories {
+		dirName := path.Base(hd)
 		absDirName := newHomeDir + "/" + dirName
 		onErrorLogAndExit(syscall.Mkdir(absDirName, 0700))
-		onErrorLogAndExit(syscall.Mount(p, absDirName, "", syscall.MS_BIND|syscall.MS_REC, ""))
+		onErrorLogAndExit(syscall.Mount(hd, absDirName, "", syscall.MS_BIND|syscall.MS_REC, ""))
 	}
 	return
 }
 
 //Starts a bash. The bash runs in a new user namespace where the root id is mapped back to the original user id and
-//the bash is chrooted in the given rootBase.
-func startCommand(rootBase string, user user.User) {
+//the bash is chrooted in the given rootBase. When the given execProgramm string is not empty it will be passed as
+//a command to the bash (so there will always be a bash for program reaping)
+func startCommand(rootBase string, user user.User, execProgramm string) {
 	uid, err := strconv.Atoi(user.Uid)
 	onErrorLogAndExit(err)
 	gid, err := strconv.Atoi(user.Gid)
 	onErrorLogAndExit(err)
-	cmd := exec.Command("/bin/bash")
+	command := "/bin/bash"
+	var cmd *exec.Cmd
+	if execProgramm != "" {
+		cmd = exec.Command(command, "-c", execProgramm)
+	} else {
+		cmd = exec.Command(command)
+	}
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
