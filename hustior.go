@@ -22,6 +22,8 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -65,12 +67,19 @@ func parseArgs() (programConfig, string) {
 	userJSON := flag.String("user", "", "")
 	execProgramm := flag.String("exec", "", "")
 	confJSON := flag.String("config", "", "")
+	confFile := flag.String("configFile", "", "A file that contains the pogram configuration encoded as JSON. See -printConfigSample to get the fileformat.")
+	printConfHelp := flag.Bool("printConfigSample", false, "Print a sample configuration and exit.")
 	flag.Parse()
+	if *printConfHelp {
+		printConfHelpAndExit()
+	}
+	if *confFile != "" {
+		raw, err := ioutil.ReadFile(*confFile)
+		onErrorLogAndExit(err)
+		onErrorLogAndExit(json.Unmarshal([]byte(raw), &pg))
+	}
 	if confJSON != nil && *confJSON != "" {
-		err := json.Unmarshal([]byte(*confJSON), &pg)
-		if err != nil {
-			onErrorLogAndExit(err)
-		}
+		onErrorLogAndExit(json.Unmarshal([]byte(*confJSON), &pg))
 	}
 	if execProgramm != nil && *execProgramm != "" {
 		pg.ExecProgramm = *execProgramm
@@ -83,6 +92,17 @@ func parseArgs() (programConfig, string) {
 		pg.HomeDirectories = homeDirectories
 	}
 	return pg, *userJSON
+}
+
+//Print a sample of the programConfig and exit the application
+func printConfHelpAndExit() {
+	var pg programConfig
+	pg.ExecProgramm = "firefox -no-remote"
+	pg.HomeDirectories = []string{"/home/user/dir1", "/home/user/dir2"}
+	sampleBinData, err := json.Marshal(pg)
+	onErrorLogAndExit(err)
+	fmt.Println(string(sampleBinData))
+	os.Exit(0)
 }
 
 //Restarts this application in a new user, mount and pid namespace while the user id
