@@ -29,6 +29,7 @@ import (
 	"os/exec"
 	"os/user"
 	"path"
+	"path/filepath"
 	"strconv"
 	"syscall"
 )
@@ -153,14 +154,15 @@ func setUpNewRootFS() (rootBase string) {
 	rootBase = "/root/base"
 	devDir := rootBase + "/dev"
 	procDir := rootBase + "/proc"
-	createDirs := []string{rootBase, devDir, rootBase + "/run", procDir, rootBase + "/tmp"}
+	createDirs := []string{rootBase, devDir, procDir, rootBase + "/tmp"}
 	for _, dir := range createDirs {
 		onErrorLangAndExitWithDesc(syscall.Mkdir(dir, 0755), dir)
 	}
-	bindDirs := []string{"/bin", "/etc", "/lib", "/lib64", "/opt", "/sbin", "/usr", "/var", "/dev/shm", "/run/resolvconf", "/run/user"}
+	bindDirs := []string{"/bin", "/etc", "/lib", "/lib64", "/opt", "/sbin", "/usr", "/var", "/dev/shm", "/run/user"}
+	bindDirs = addResolvConfDir(bindDirs)
 	for _, dir := range bindDirs {
 		path := rootBase + dir
-		onErrorLangAndExitWithDesc(syscall.Mkdir(path, 0755), path)
+		onErrorLangAndExitWithDesc(os.MkdirAll(path, 0755), path)
 		onErrorLangAndExitWithDesc(syscall.Mount(dir, path, "", syscall.MS_REC|syscall.MS_BIND, ""), path)
 	}
 	devFiles := []string{"random", "urandom", "null", "zero"}
@@ -173,6 +175,21 @@ func setUpNewRootFS() (rootBase string) {
 	err = syscall.Mount("proc", procDir, "proc", syscall.MS_NOSUID|syscall.MS_NOEXEC|syscall.MS_NODEV, "")
 	onErrorLogAndExit(err)
 	return
+}
+
+//Checks if /etc/resolv.conf is a symlink and if yes adds the directorly of the symlink target to bindDirs
+//The result is the bindDirs with resolv.conf directory or the unaltered  bindDirs when /etc/resolv.conf is a normal file.
+func addResolvConfDir(bindDirs []string) []string {
+	resolvConf := "/etc/resolv.conf"
+	resolvConfStat, err := os.Lstat(resolvConf)
+	onErrorLangAndExitWithDesc(err, "Stat "+resolvConf)
+	if resolvConfStat.Mode()&os.ModeSymlink != 0 {
+		realResolvConf, err := filepath.EvalSymlinks(resolvConf)
+		onErrorLangAndExitWithDesc(err, "EvalSymlinks "+resolvConf)
+		realResolvConfParentDir := path.Dir(realResolvConf)
+		bindDirs = append(bindDirs, realResolvConfParentDir)
+	}
+	return bindDirs
 }
 
 //Takes the strings in homeDirectories as directories that are bound under <rootBase>/home/<user>/
