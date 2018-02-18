@@ -158,8 +158,9 @@ func setUpNewRootFS() (rootBase string) {
 	for _, dir := range createDirs {
 		onErrorLangAndExitWithDesc(syscall.Mkdir(dir, 0755), dir)
 	}
-	bindDirs := []string{"/bin", "/etc", "/lib", "/lib64", "/opt", "/sbin", "/usr", "/var", "/dev/shm", "/run/user"}
+	bindDirs := []string{"/bin", "/etc", "/lib", "/opt", "/sbin", "/usr", "/var", "/dev/shm", "/run/user"}
 	bindDirs = addResolvConfDir(bindDirs)
+	bindDirs = addLib64(bindDirs)
 	for _, dir := range bindDirs {
 		path := rootBase + dir
 		onErrorLangAndExitWithDesc(os.MkdirAll(path, 0755), path)
@@ -177,7 +178,7 @@ func setUpNewRootFS() (rootBase string) {
 	return
 }
 
-//Checks if /etc/resolv.conf is a symlink and if yes adds the directorly of the symlink target to bindDirs
+//Checks if /etc/resolv.conf is a symlink and if yes adds the directory of the symlink target to bindDirs
 //The result is the bindDirs with resolv.conf directory or the unaltered  bindDirs when /etc/resolv.conf is a normal file.
 func addResolvConfDir(bindDirs []string) []string {
 	resolvConf := "/etc/resolv.conf"
@@ -188,6 +189,16 @@ func addResolvConfDir(bindDirs []string) []string {
 		onErrorLangAndExitWithDesc(err, "EvalSymlinks "+resolvConf)
 		realResolvConfParentDir := path.Dir(realResolvConf)
 		bindDirs = append(bindDirs, realResolvConfParentDir)
+	}
+	return bindDirs
+}
+
+//Checks if there is a /lib64 folder and if yes adds it to the bindDirs.
+//The result is the bindDirs with /lib64 or the unaltered  bindDirs when there is no /lib64.
+func addLib64(bindDirs []string) []string {
+	lib64 := "/lib64"
+	if _, err := os.Stat(lib64); err == nil {
+		bindDirs = append(bindDirs, lib64)
 	}
 	return bindDirs
 }
