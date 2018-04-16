@@ -40,6 +40,7 @@ import (
 type programConfig struct {
 	ExecProgramm    string
 	HomeDirectories []string
+	AdditionalBindings []string
 }
 
 func main() {
@@ -54,7 +55,7 @@ func main() {
 		log.Println("Wrong user provided. Please don't use the argument manually")
 		return
 	}
-	rootBase := setUpNewRootFS()
+	rootBase := setUpNewRootFS(pg.AdditionalBindings)
 	setUpHomeDirectory(rootBase, user, pg.HomeDirectories)
 	startCommand(rootBase, user, pg.ExecProgramm)
 }
@@ -100,6 +101,7 @@ func printConfHelpAndExit() {
 	var pg programConfig
 	pg.ExecProgramm = "firefox -no-remote"
 	pg.HomeDirectories = []string{"/home/user/dir1", "/home/user/dir2"}
+	pg.AdditionalBindings = []string{"/run/screen","/dev/tty"}
 	sampleBinData, err := json.Marshal(pg)
 	onErrorLogAndExit(err)
 	fmt.Println(string(sampleBinData))
@@ -146,7 +148,7 @@ func restartInNamespace(pg programConfig) {
 
 //Sets up a new root filesystem that the sandbox should use.
 //The return value is the location of the new root.
-func setUpNewRootFS() (rootBase string) {
+func setUpNewRootFS(additionalBindings []string) (rootBase string) {
 	err := syscall.Mount("none", "/", "", syscall.MS_REC|syscall.MS_PRIVATE, "")
 	onErrorLogAndExit(err)
 	err = syscall.Mount("none", "/root", "tmpfs", 0, "size=200M")
@@ -155,20 +157,27 @@ func setUpNewRootFS() (rootBase string) {
 	devDir := rootBase + "/dev"
 	procDir := rootBase + "/proc"
 	createDirs := []string{rootBase, devDir, procDir, rootBase + "/tmp"}
-	for _, dir := range createDirs {
-		onErrorLangAndExitWithDesc(syscall.Mkdir(dir, 0755), dir)
-	}
 	bindDirs := []string{"/bin", "/etc", "/lib", "/opt", "/sbin", "/usr", "/var", "/dev/shm", "/run/user"}
 	bindDirs = addResolvConfDir(bindDirs)
 	bindDirs = addLib64(bindDirs)
+	bindDirs,createDirs,bindFiles := addAdditionalBindings(bindDirs,createDirs,additionalBindings,rootBase)
+	for _, dir := range createDirs {
+		onErrorLogAndExitWithDesc(syscall.Mkdir(dir, 0755), dir)
+	}
 	for _, dir := range bindDirs {
 		path := rootBase + dir
-		onErrorLangAndExitWithDesc(os.MkdirAll(path, 0755), path)
-		onErrorLangAndExitWithDesc(syscall.Mount(dir, path, "", syscall.MS_REC|syscall.MS_BIND, ""), path)
+		onErrorLogAndExitWithDesc(os.MkdirAll(path, 0755), path)
+		onErrorLogAndExitWithDesc(syscall.Mount(dir, path, "", syscall.MS_REC|syscall.MS_BIND, ""), path)
+	}
+	for _, file := range bindFiles {
+		bindFile, err := os.OpenFile(rootBase+file, os.O_RDONLY|os.O_CREATE, 0666)
+		onErrorLogAndExitWithDesc(err,"Error creating binding file  "+file)
+		bindFile.Close()
+		onErrorLogAndExitWithDesc(syscall.Mount(file, rootBase+file, "", syscall.MS_BIND, ""),"Error binding file  "+file)
 	}
 	devFiles := []string{"random", "urandom", "null", "zero"}
 	for _, devFile := range devFiles {
-		onErrorLangAndExitWithDesc(mountBindDevDir(devDir, devFile), "/dev/"+devFile)
+		onErrorLogAndExitWithDesc(mountBindDevDir(devDir, devFile), "/dev/"+devFile)
 	}
 	//The mount of /proc is currently necessary or I will get a "fork/exec /bin/bash: permission denied"
 	err = syscall.Mount("proc", "/proc", "proc", syscall.MS_NOSUID|syscall.MS_NOEXEC|syscall.MS_NODEV, "")
@@ -178,15 +187,42 @@ func setUpNewRootFS() (rootBase string) {
 	return
 }
 
+//Takes the additional bindings and adds them to bindDirs (when the additional binding is referencing to a directory) or 
+//to createDirs and returns a bindFiles array for binding single files to the new root filesystem.
+func addAdditionalBindings(bindDirs, createDirs, additionalBindings []string, rootBase string) ([]string,[]string,[]string) {
+	bindFiles := []string{}
+	for _,binding := range additionalBindings {
+		bindingStat, err := os.Stat(binding)
+		onErrorLogAndExitWithDesc(err,"Error inspecting "+binding)
+		if bindingStat.IsDir() {
+			bindDirs = append(bindDirs, binding)
+		} else {
+			bindFiles = append(bindFiles,binding)
+			bindingParent := rootBase+filepath.Dir(binding)
+			createDirsContainsbindingParent := false
+			for _,createDir := range createDirs {
+				if bindingParent==createDir {
+					createDirsContainsbindingParent=true
+					break
+				}
+			}
+			if !createDirsContainsbindingParent {
+				createDirs = append(createDirs, bindingParent)
+			}
+		}
+	}
+	return bindDirs,createDirs,bindFiles
+}
+
 //Checks if /etc/resolv.conf is a symlink and if yes adds the directory of the symlink target to bindDirs
 //The result is the bindDirs with resolv.conf directory or the unaltered  bindDirs when /etc/resolv.conf is a normal file.
 func addResolvConfDir(bindDirs []string) []string {
 	resolvConf := "/etc/resolv.conf"
 	resolvConfStat, err := os.Lstat(resolvConf)
-	onErrorLangAndExitWithDesc(err, "Stat "+resolvConf)
+	onErrorLogAndExitWithDesc(err, "Stat "+resolvConf)
 	if resolvConfStat.Mode()&os.ModeSymlink != 0 {
 		realResolvConf, err := filepath.EvalSymlinks(resolvConf)
-		onErrorLangAndExitWithDesc(err, "EvalSymlinks "+resolvConf)
+		onErrorLogAndExitWithDesc(err, "EvalSymlinks "+resolvConf)
 		realResolvConfParentDir := path.Dir(realResolvConf)
 		bindDirs = append(bindDirs, realResolvConfParentDir)
 	}
@@ -276,7 +312,7 @@ func onErrorLogAndExit(e error) {
 }
 
 // When the given error is not nil then print it together with the description and exit the appication.
-func onErrorLangAndExitWithDesc(e error, description string) {
+func onErrorLogAndExitWithDesc(e error, description string) {
 	if e != nil {
 		log.Fatal(description, e)
 	}

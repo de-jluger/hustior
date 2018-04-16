@@ -16,7 +16,8 @@ If you call hustior with no arguments it will start a bash and you will be in yo
 When you call hustior with the argument "/home/<user>/path1/path2" it will be the same as above except that you have one directory in your home: "path2". "path2" will contain all the subdirectories and files that it also contains outside of the hustior started bash.  
 When stopping the hustior started bash all files saved in the home will disappear. Except they were stored in a mounted directory. Like e.g. "path2" from the example above.
 With the parameter "-exec" you can pass a program name that the bash will execute as a command. This allows you also to add parameters to the program. As a downside the program needs to be blocking or the bash will end and with it the desired program.  
-With the parameter "-configFile" you can specify a file that contains on of the previous mentioned configurations. Use "-printConfigSample" to get a sample.
+With the parameter "-configFile" you can specify a file that contains one or all of the previous mentioned configurations. Use "-printConfigSample" to get a sample.  
+I've added an additional parameter "AdditionalBindings" that is only available via a config file. With that you cann specify additional files and folders that should be visible in the container.
 
 ## When to use
 Use it when you want to get an extra line of defense before executing software or surfing on a site when everything should be OK. E.g. you start software like NodeJS, VisualCode, Eclipse, ... All this software is created by well known companies/organisations and used by millions of people. It should be safe to use. But one malicious/infected plugin and an attacker has access to all your mails/picutures/videos/documents. See https://xkcd.com/1200/.  
