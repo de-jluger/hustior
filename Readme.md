@@ -41,4 +41,5 @@ With the argument -configFile you can pass a json file with additional configura
 ExecProgramm: Directly start a program in hustior instead of a bash.  
 HomeDirectories: A list of directies that should be visible in your home directory.  
 AdditionalBindings: I wanted to keep the files visible in hustior minimal. When there is a directory/file you need in hustior add it here.  
-HomeDirectory: Normally your home directory in hustior is on a 200MB temp filesystem. With this parameter you can specify a directory to act as your new home directory.
+HomeDirectory: Normally your home directory in hustior is on a 200MB temp filesystem. With this parameter you can specify a directory to act as your new home directory.  
+ProvideTty: When true it provides /dev/pts which is required for screen or the terminal in VisualStudio Code.

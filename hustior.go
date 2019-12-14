@@ -1,5 +1,5 @@
 /*
-   Copyright (C) 2017-2018  J. Luger
+   Copyright (C) 2017-2019  J. Luger
 
    This file is part of hustior.
 
@@ -42,6 +42,7 @@ type programConfig struct {
 	HomeDirectories    []string
 	AdditionalBindings []string
 	HomeDirectory      string
+	ProvideTty         bool
 }
 
 func main() {
@@ -56,7 +57,7 @@ func main() {
 		log.Println("Wrong user provided. Please don't use the argument manually")
 		return
 	}
-	rootBase := setUpNewRootFS(pg.AdditionalBindings)
+	rootBase := setUpNewRootFS(pg.AdditionalBindings, pg.ProvideTty)
 	setUpHomeDirectory(rootBase, user, pg.HomeDirectory, pg.HomeDirectories)
 	startCommand(rootBase, user, pg.ExecProgramm)
 }
@@ -104,6 +105,7 @@ func printConfHelpAndExit() {
 	pg.HomeDirectories = []string{"/home/user/dir1", "/home/user/dir2"}
 	pg.AdditionalBindings = []string{"/run/screen", "/dev/tty"}
 	pg.HomeDirectory = "/home/user/app1_home"
+	pg.ProvideTty = true
 	sampleBinData, err := json.Marshal(pg)
 	onErrorLogAndExit(err)
 	fmt.Println(string(sampleBinData))
@@ -150,7 +152,7 @@ func restartInNamespace(pg programConfig) {
 
 //Sets up a new root filesystem that the sandbox should use.
 //The return value is the location of the new root.
-func setUpNewRootFS(additionalBindings []string) (rootBase string) {
+func setUpNewRootFS(additionalBindings []string, provideTty bool) (rootBase string) {
 	err := syscall.Mount("none", "/", "", syscall.MS_REC|syscall.MS_PRIVATE, "")
 	onErrorLogAndExit(err)
 	err = syscall.Mount("none", "/root", "tmpfs", 0, "size=200M")
@@ -186,6 +188,14 @@ func setUpNewRootFS(additionalBindings []string) (rootBase string) {
 	onErrorLogAndExit(err)
 	err = syscall.Mount("proc", procDir, "proc", syscall.MS_NOSUID|syscall.MS_NOEXEC|syscall.MS_NODEV, "")
 	onErrorLogAndExit(err)
+	if provideTty {
+		ptsDir := devDir + "/pts"
+		onErrorLogAndExitWithDesc(syscall.Mkdir(ptsDir, 0755), ptsDir)
+		err = syscall.Mount("devpts", ptsDir, "devpts", syscall.MS_NOSUID|syscall.MS_NOEXEC, "ptmxmode=0666,newinstance")
+		onErrorLogAndExit(err)
+		err = syscall.Symlink("/dev/pts/ptmx", devDir+"/ptmx")
+		onErrorLogAndExit(err)
+	}
 	return
 }
 
