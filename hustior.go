@@ -41,6 +41,7 @@ type programConfig struct {
 	ExecProgramm    string
 	HomeDirectories []string
 	AdditionalBindings []string
+	HomeDirectory string
 }
 
 func main() {
@@ -56,7 +57,7 @@ func main() {
 		return
 	}
 	rootBase := setUpNewRootFS(pg.AdditionalBindings)
-	setUpHomeDirectory(rootBase, user, pg.HomeDirectories)
+	setUpHomeDirectory(rootBase, user, pg.HomeDirectory, pg.HomeDirectories)
 	startCommand(rootBase, user, pg.ExecProgramm)
 }
 
@@ -102,6 +103,7 @@ func printConfHelpAndExit() {
 	pg.ExecProgramm = "firefox -no-remote"
 	pg.HomeDirectories = []string{"/home/user/dir1", "/home/user/dir2"}
 	pg.AdditionalBindings = []string{"/run/screen","/dev/tty"}
+	pg.HomeDirectory = "/home/user/app1_home"
 	sampleBinData, err := json.Marshal(pg)
 	onErrorLogAndExit(err)
 	fmt.Println(string(sampleBinData))
@@ -240,9 +242,12 @@ func addLib64(bindDirs []string) []string {
 }
 
 //Takes the strings in homeDirectories as directories that are bound under <rootBase>/home/<user>/
-func setUpHomeDirectory(rootBase string, user user.User, homeDirectories []string) {
+func setUpHomeDirectory(rootBase string, user user.User, homeDirectory string, homeDirectories []string) {
 	newHomeDir := rootBase + user.HomeDir
 	onErrorLogAndExit(os.MkdirAll(newHomeDir, 0700))
+	if homeDirectory != "" {
+		onErrorLogAndExitWithDesc(syscall.Mount(homeDirectory, newHomeDir, "", syscall.MS_REC|syscall.MS_BIND, ""), newHomeDir)
+	}
 	for _, hd := range homeDirectories {
 		dirName := path.Base(hd)
 		absDirName := newHomeDir + "/" + dirName

@@ -4,6 +4,7 @@
 3. [When to use](#third-example)
 4. [When not to use](#when-not-to-use)
 5. [Limits](#limits)
+6. [Configuration file](#configuration-file)
 
 
 ## How to build
@@ -34,3 +35,10 @@ The started programs have full network access and can even access ports opened b
 The processes started by the hustior bash aren't isolated from attacks outside. E.g. an attacker made it to your machine and runs in your user context (not restricted by hustior) and you start a browser from the hustior bash. The attacker can see the browser.  
 Setuid won't work. As a normal user you can only map your own user id. Per default "an unmapped user ID is converted to the overflow user ID"(http://man7.org/linux/man-pages/man7/user_namespaces.7.html). So in the restarted hustior all files that belonged to root will belong to nobody (when nobody has the overflow user ID). I haven't found a way to fix this when starting the bash. So in the bash the setuid programs like ping or Chrome sandbox won't start as the don't belong to root.  
 Please also note that hustior is currently tested only on Ubuntu 17.10.
+
+## Configuration file
+With the argument -configFile you can pass a json file with additional configuration. Use -printConfigSample to get a sample.  
+ExecProgramm: Directly start a program in hustior instead of a bash.  
+HomeDirectories: A list of directies that should be visible in your home directory.  
+AdditionalBindings: I wanted to keep the files visible in hustior minimal. When there is a directory/file you need in hustior add it here.  
+HomeDirectory: Normally your home directory in hustior is on a 200MB temp filesystem. With this parameter you can specify a directory to act as your new home directory.
