@@ -38,10 +38,10 @@ import (
 //This is needed to easily pass program configration to the children created after
 //the original invocation through the user.
 type programConfig struct {
-	ExecProgramm    string
-	HomeDirectories []string
+	ExecProgramm       string
+	HomeDirectories    []string
 	AdditionalBindings []string
-	HomeDirectory string
+	HomeDirectory      string
 }
 
 func main() {
@@ -102,7 +102,7 @@ func printConfHelpAndExit() {
 	var pg programConfig
 	pg.ExecProgramm = "firefox -no-remote"
 	pg.HomeDirectories = []string{"/home/user/dir1", "/home/user/dir2"}
-	pg.AdditionalBindings = []string{"/run/screen","/dev/tty"}
+	pg.AdditionalBindings = []string{"/run/screen", "/dev/tty"}
 	pg.HomeDirectory = "/home/user/app1_home"
 	sampleBinData, err := json.Marshal(pg)
 	onErrorLogAndExit(err)
@@ -162,7 +162,7 @@ func setUpNewRootFS(additionalBindings []string) (rootBase string) {
 	bindDirs := []string{"/bin", "/etc", "/lib", "/opt", "/sbin", "/usr", "/var", "/dev/shm", "/run/user"}
 	bindDirs = addResolvConfDir(bindDirs)
 	bindDirs = addLib64(bindDirs)
-	bindDirs,createDirs,bindFiles := addAdditionalBindings(bindDirs,createDirs,additionalBindings,rootBase)
+	bindDirs, createDirs, bindFiles := addAdditionalBindings(bindDirs, createDirs, additionalBindings, rootBase)
 	for _, dir := range createDirs {
 		onErrorLogAndExitWithDesc(syscall.Mkdir(dir, 0755), dir)
 	}
@@ -173,9 +173,9 @@ func setUpNewRootFS(additionalBindings []string) (rootBase string) {
 	}
 	for _, file := range bindFiles {
 		bindFile, err := os.OpenFile(rootBase+file, os.O_RDONLY|os.O_CREATE, 0666)
-		onErrorLogAndExitWithDesc(err,"Error creating binding file  "+file)
+		onErrorLogAndExitWithDesc(err, "Error creating binding file  "+file)
 		bindFile.Close()
-		onErrorLogAndExitWithDesc(syscall.Mount(file, rootBase+file, "", syscall.MS_BIND, ""),"Error binding file  "+file)
+		onErrorLogAndExitWithDesc(syscall.Mount(file, rootBase+file, "", syscall.MS_BIND, ""), "Error binding file  "+file)
 	}
 	devFiles := []string{"random", "urandom", "null", "zero"}
 	for _, devFile := range devFiles {
@@ -189,22 +189,22 @@ func setUpNewRootFS(additionalBindings []string) (rootBase string) {
 	return
 }
 
-//Takes the additional bindings and adds them to bindDirs (when the additional binding is referencing to a directory) or 
+//Takes the additional bindings and adds them to bindDirs (when the additional binding is referencing to a directory) or
 //to createDirs and returns a bindFiles array for binding single files to the new root filesystem.
-func addAdditionalBindings(bindDirs, createDirs, additionalBindings []string, rootBase string) ([]string,[]string,[]string) {
+func addAdditionalBindings(bindDirs, createDirs, additionalBindings []string, rootBase string) ([]string, []string, []string) {
 	bindFiles := []string{}
-	for _,binding := range additionalBindings {
+	for _, binding := range additionalBindings {
 		bindingStat, err := os.Stat(binding)
-		onErrorLogAndExitWithDesc(err,"Error inspecting "+binding)
+		onErrorLogAndExitWithDesc(err, "Error inspecting "+binding)
 		if bindingStat.IsDir() {
 			bindDirs = append(bindDirs, binding)
 		} else {
-			bindFiles = append(bindFiles,binding)
-			bindingParent := rootBase+filepath.Dir(binding)
+			bindFiles = append(bindFiles, binding)
+			bindingParent := rootBase + filepath.Dir(binding)
 			createDirsContainsbindingParent := false
-			for _,createDir := range createDirs {
-				if bindingParent==createDir {
-					createDirsContainsbindingParent=true
+			for _, createDir := range createDirs {
+				if bindingParent == createDir {
+					createDirsContainsbindingParent = true
 					break
 				}
 			}
@@ -213,7 +213,7 @@ func addAdditionalBindings(bindDirs, createDirs, additionalBindings []string, ro
 			}
 		}
 	}
-	return bindDirs,createDirs,bindFiles
+	return bindDirs, createDirs, bindFiles
 }
 
 //Checks if /etc/resolv.conf is a symlink and if yes adds the directory of the symlink target to bindDirs
