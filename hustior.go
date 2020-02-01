@@ -261,7 +261,8 @@ func setUpHomeDirectory(rootBase string, user user.User, homeDirectory string, h
 	for _, hd := range homeDirectories {
 		dirName := path.Base(hd)
 		absDirName := newHomeDir + "/" + dirName
-		onErrorLogAndExit(syscall.Mkdir(absDirName, 0700))
+		//MkdirAll ignores if the folder already exists by e.g. previous runs.
+		onErrorLogAndExit(os.MkdirAll(absDirName, 0700))
 		onErrorLogAndExit(syscall.Mount(hd, absDirName, "", syscall.MS_BIND|syscall.MS_REC, ""))
 	}
 	return
