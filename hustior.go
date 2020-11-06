@@ -43,6 +43,7 @@ type programConfig struct {
 	AdditionalBindings []string
 	HomeDirectory      string
 	ProvideTty         bool
+	AllowSshForward    bool
 }
 
 func main() {
@@ -58,7 +59,7 @@ func main() {
 		return
 	}
 	rootBase := setUpNewRootFS(pg.AdditionalBindings, pg.ProvideTty)
-	setUpHomeDirectory(rootBase, user, pg.HomeDirectory, pg.HomeDirectories)
+	setUpHomeDirectory(rootBase, user, pg.HomeDirectory, pg.HomeDirectories, pg.AllowSshForward)
 	startCommand(rootBase, user, pg.ExecProgramm)
 }
 
@@ -106,6 +107,7 @@ func printConfHelpAndExit() {
 	pg.AdditionalBindings = []string{"/run/screen", "/dev/tty"}
 	pg.HomeDirectory = "/home/user/app1_home"
 	pg.ProvideTty = true
+	pg.AllowSshForward = true
 	sampleBinData, err := json.Marshal(pg)
 	onErrorLogAndExit(err)
 	fmt.Println(string(sampleBinData))
@@ -252,7 +254,7 @@ func addLib64(bindDirs []string) []string {
 }
 
 //Takes the strings in homeDirectories as directories that are bound under <rootBase>/home/<user>/
-func setUpHomeDirectory(rootBase string, user user.User, homeDirectory string, homeDirectories []string) {
+func setUpHomeDirectory(rootBase string, user user.User, homeDirectory string, homeDirectories []string, allowSshForward bool) {
 	newHomeDir := rootBase + user.HomeDir
 	onErrorLogAndExit(os.MkdirAll(newHomeDir, 0700))
 	if homeDirectory != "" {
@@ -264,6 +266,14 @@ func setUpHomeDirectory(rootBase string, user user.User, homeDirectory string, h
 		//MkdirAll ignores if the folder already exists by e.g. previous runs.
 		onErrorLogAndExit(os.MkdirAll(absDirName, 0700))
 		onErrorLogAndExit(syscall.Mount(hd, absDirName, "", syscall.MS_BIND|syscall.MS_REC, ""))
+	}
+	if allowSshForward {
+		sourceXauthority := user.HomeDir + "/.Xauthority"
+		targetXauthority := newHomeDir + "/.Xauthority"
+		bindFile, err := os.OpenFile(targetXauthority, os.O_RDONLY|os.O_CREATE, 0666)
+		onErrorLogAndExitWithDesc(err, "Error creating binding file  "+sourceXauthority)
+		bindFile.Close()
+		onErrorLogAndExitWithDesc(syscall.Mount(sourceXauthority, targetXauthority, "", syscall.MS_BIND, ""), "Error binding file  "+sourceXauthority)
 	}
 	return
 }
