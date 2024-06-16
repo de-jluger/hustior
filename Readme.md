@@ -1,6 +1,6 @@
 # Table of Contents
 1. [How to build](#how-to-build)
-2. [Ubuntu 24.04](#Ubuntu-24.04)
+2. [Ubuntu 24.04](#ubuntu-2404)
 2. [What does it do](#What-does-it-do)
 3. [When to use](#third-example)
 4. [When not to use](#when-not-to-use)
