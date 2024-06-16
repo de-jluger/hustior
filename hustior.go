@@ -34,9 +34,9 @@ import (
 	"syscall"
 )
 
-//Stores the configuration of the program.
-//This is needed to easily pass program configration to the children created after
-//the original invocation through the user.
+// Stores the configuration of the program.
+// This is needed to easily pass program configration to the children created after
+// the original invocation through the user.
 type programConfig struct {
 	ExecProgramm       string
 	HomeDirectories    []string
@@ -63,10 +63,10 @@ func main() {
 	startCommand(rootBase, user, pg.ExecProgramm)
 }
 
-//Parses the program arguments for the programConfig and the user information.
-//The user information is either an emtpy string (tpyicall on invocation through the user)
-//or the JSON version of the user.User instance of the original caller.
-//programConfig is always there but its field may be empty.
+// Parses the program arguments for the programConfig and the user information.
+// The user information is either an emtpy string (tpyicall on invocation through the user)
+// or the JSON version of the user.User instance of the original caller.
+// programConfig is always there but its field may be empty.
 func parseArgs() (programConfig, string) {
 	var pg programConfig
 	userJSON := flag.String("user", "", "")
@@ -99,7 +99,7 @@ func parseArgs() (programConfig, string) {
 	return pg, *userJSON
 }
 
-//Print a sample of the programConfig and exit the application
+// Print a sample of the programConfig and exit the application
 func printConfHelpAndExit() {
 	var pg programConfig
 	pg.ExecProgramm = "firefox -no-remote"
@@ -114,9 +114,9 @@ func printConfHelpAndExit() {
 	os.Exit(0)
 }
 
-//Restarts this application in a new user, mount and pid namespace while the user id
-//of the caller is mapped to 0.
-//The given programConfig will be passed to the newly created child process.
+// Restarts this application in a new user, mount and pid namespace while the user id
+// of the caller is mapped to 0.
+// The given programConfig will be passed to the newly created child process.
 func restartInNamespace(pg programConfig) {
 	user, err := user.Current()
 	onErrorLogAndExit(err)
@@ -152,11 +152,11 @@ func restartInNamespace(pg programConfig) {
 	onErrorLogAndExit(cmd.Run())
 }
 
-//Sets up a new root filesystem that the sandbox should use.
-//The return value is the location of the new root.
+// Sets up a new root filesystem that the sandbox should use.
+// The return value is the location of the new root.
 func setUpNewRootFS(additionalBindings []string, provideTty bool) (rootBase string) {
 	err := syscall.Mount("none", "/", "", syscall.MS_REC|syscall.MS_PRIVATE, "")
-	onErrorLogAndExit(err)
+	onErrorLogAndExitWithDesc(err, "Failed mount \"/\": ")
 	err = syscall.Mount("none", "/root", "tmpfs", 0, "size=200M")
 	onErrorLogAndExit(err)
 	rootBase = "/root/base"
@@ -201,8 +201,8 @@ func setUpNewRootFS(additionalBindings []string, provideTty bool) (rootBase stri
 	return
 }
 
-//Takes the additional bindings and adds them to bindDirs (when the additional binding is referencing to a directory) or
-//to createDirs and returns a bindFiles array for binding single files to the new root filesystem.
+// Takes the additional bindings and adds them to bindDirs (when the additional binding is referencing to a directory) or
+// to createDirs and returns a bindFiles array for binding single files to the new root filesystem.
 func addAdditionalBindings(bindDirs, createDirs, additionalBindings []string, rootBase string) ([]string, []string, []string) {
 	bindFiles := []string{}
 	for _, binding := range additionalBindings {
@@ -228,8 +228,8 @@ func addAdditionalBindings(bindDirs, createDirs, additionalBindings []string, ro
 	return bindDirs, createDirs, bindFiles
 }
 
-//Checks if /etc/resolv.conf is a symlink and if yes adds the directory of the symlink target to bindDirs
-//The result is the bindDirs with resolv.conf directory or the unaltered  bindDirs when /etc/resolv.conf is a normal file.
+// Checks if /etc/resolv.conf is a symlink and if yes adds the directory of the symlink target to bindDirs
+// The result is the bindDirs with resolv.conf directory or the unaltered  bindDirs when /etc/resolv.conf is a normal file.
 func addResolvConfDir(bindDirs []string) []string {
 	resolvConf := "/etc/resolv.conf"
 	resolvConfStat, err := os.Lstat(resolvConf)
@@ -243,8 +243,8 @@ func addResolvConfDir(bindDirs []string) []string {
 	return bindDirs
 }
 
-//Checks if there is a /lib64 folder and if yes adds it to the bindDirs.
-//The result is the bindDirs with /lib64 or the unaltered  bindDirs when there is no /lib64.
+// Checks if there is a /lib64 folder and if yes adds it to the bindDirs.
+// The result is the bindDirs with /lib64 or the unaltered  bindDirs when there is no /lib64.
 func addLib64(bindDirs []string) []string {
 	lib64 := "/lib64"
 	if _, err := os.Stat(lib64); err == nil {
@@ -253,7 +253,7 @@ func addLib64(bindDirs []string) []string {
 	return bindDirs
 }
 
-//Takes the strings in homeDirectories as directories that are bound under <rootBase>/home/<user>/
+// Takes the strings in homeDirectories as directories that are bound under <rootBase>/home/<user>/
 func setUpHomeDirectory(rootBase string, user user.User, homeDirectory string, homeDirectories []string, allowSshForward bool) {
 	newHomeDir := rootBase + user.HomeDir
 	onErrorLogAndExit(os.MkdirAll(newHomeDir, 0700))
@@ -278,9 +278,9 @@ func setUpHomeDirectory(rootBase string, user user.User, homeDirectory string, h
 	return
 }
 
-//Starts a bash. The bash runs in a new user namespace where the root id is mapped back to the original user id and
-//the bash is chrooted in the given rootBase. When the given execProgramm string is not empty it will be passed as
-//a command to the bash (so there will always be a bash for program reaping)
+// Starts a bash. The bash runs in a new user namespace where the root id is mapped back to the original user id and
+// the bash is chrooted in the given rootBase. When the given execProgramm string is not empty it will be passed as
+// a command to the bash (so there will always be a bash for program reaping)
 func startCommand(rootBase string, user user.User, execProgramm string) {
 	uid, err := strconv.Atoi(user.Uid)
 	onErrorLogAndExit(err)
@@ -318,7 +318,7 @@ func startCommand(rootBase string, user user.User, execProgramm string) {
 	onErrorLogAndExit(cmd.Run())
 }
 
-//Creates the given device file in the given dev dir and then bind the device file from /dev to it.
+// Creates the given device file in the given dev dir and then bind the device file from /dev to it.
 func mountBindDevDir(devDir, deviceName string) error {
 	devicePath := devDir + "/" + deviceName
 	deviceFile, err := os.OpenFile(devicePath, os.O_RDONLY|os.O_CREATE, 0666)
