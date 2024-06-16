@@ -1,5 +1,6 @@
 # Table of Contents
 1. [How to build](#how-to-build)
+2. [Ubuntu 24.04](#Ubuntu-24.04)
 2. [What does it do](#What-does-it-do)
 3. [When to use](#third-example)
 4. [When not to use](#when-not-to-use)
@@ -10,6 +11,8 @@
 ## How to build
 go build hustior.go
 
+## Ubuntu 24.04
+Since Ubuntu 24.04 thre creation of unprivileged user namespaces is restricted. This affects hustior. In order to make hustior work you need to copy hustior.apparmor.template to /etc/apparmor.d/hustior and then replace /path/to/hustior with the real path on your system.
 
 ## What does it do?
 hustior tries to hide all of your home directory except the folders you specify as the program arguments and it will hide all other processes.  
