@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -79,7 +78,7 @@ func parseArgs() (programConfig, string) {
 		printConfHelpAndExit()
 	}
 	if *confFile != "" {
-		raw, err := ioutil.ReadFile(*confFile)
+		raw, err := os.ReadFile((*confFile))
 		onErrorLogAndExit(err)
 		onErrorLogAndExit(json.Unmarshal([]byte(raw), &pg))
 	}
